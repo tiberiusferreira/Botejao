@@ -1,0 +1,16 @@
+[package]
+name = "Botejao"
+version = "0.1.0"
+authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
+
+[dependencies]
+scraper = "*"
+error-chain = "*"
+flexi_logger = "*"
+log = "*"
+futures = "*"
+time = "*"
+encoding = "*"
+reqwest = "*"
+teleborg = "0.1.32"
+
