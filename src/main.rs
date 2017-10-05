@@ -2,14 +2,15 @@
 extern crate telegram_bot;
 extern crate tokio_core;
 extern crate futures;
-// botejão
 
+extern crate encoding;
 extern crate reqwest;
 #[macro_use]
 extern crate error_chain;
 extern crate scraper;
 use telegram_bot::*;
-
+use encoding::{Encoding, DecoderTrap};
+use encoding::all::ISO_8859_1;
 use std::io::{self, Read, Write};
 
 use scraper::{Selector, Html};
@@ -33,14 +34,17 @@ fn run() -> Result<()> {
 
     let api = Api::from_token("454527929:AAHj82aCosGe1M8H6Wvohy0jznpkXLsjPq4").unwrap();
     let mut resp = reqwest::get("https://www.prefeitura.unicamp.br/apps/site/cardapio.php")?;
-
+    println!("{}",resp.headers());
     let mut body = Vec::new();
+
     let mut body_str = String::new();
 
 
     resp.read_to_end(&mut body).unwrap();
     match resp.read_to_end(&mut body) {
-        Ok(_) => body_str = String::from_utf8_lossy(&*body).to_string(),
+        Ok(_) => {
+            body_str = ISO_8859_1.decode(&*body, DecoderTrap::Strict).unwrap();
+        },
         Err(why) => panic!("String conversion failure: {:?}", why),
     }
     let fragment = Html::parse_fragment(&body_str);
@@ -114,15 +118,16 @@ fn run() -> Result<()> {
 
 
     let all_meals = format!("{}\n{}\n{}\n{}", lunch, dinner, lunch_veg, dinner_veg);
-    println!("{:?}", dinner_veg);
-        api.send_message(
-            -1001121845452,
-            all_meals,
-            None,
-            None,
-            None,
-            None,
-        ).unwrap();
+
+    api.send_message(
+          // -1001121845452, // gringos house moradores
+        75698394, // eu
+        all_meals,
+        None,
+        None,
+        None,
+        None,
+    ).unwrap();
 
 
 
