@@ -7,9 +7,11 @@ authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
 scraper = "0.4.0"
 reqwest = "0.8.0"
 error-chain = "0.11.0"
-log = "0.3.8"
+flexi_logger = "0.6"
+log = "*"
 telegram-bot = "0.5"
 futures = "0.1.14"
 tokio-core = "0.1"
 time = "0.1.38"
 encoding = "0.2"
+
