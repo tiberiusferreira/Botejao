@@ -25,36 +25,18 @@ use teleborg::objects::Update;
 use flexi_logger::Logger;
 use scraper::{Selector, Html};
 use std::fs::OpenOptions;
+use std::env;
 
-//error_chain! {
-//    foreign_links {
-//        ReqError(reqwest::Error);
-//        IoError(std::io::Error);
-//    }
-//}
-//
-//fn is_text_msg(msg: &Message) -> bool{
-//    match msg.msg {
-//        MessageType::Text(_) => return true,
-//        _ => return false
-//    }
-//}
-
-//pub fn get_msg_text(msg: &Message) -> &str{
-//    match msg.msg {
-//        MessageType::Text(ref content) => return content,
-//        _ => panic!("Not a text msg")
-//    }
-//}
 
 fn remove_spaces_and_tabs(selector: &Selector, fragment: &Html) -> String {
     let mut formated = fragment.select(&selector).next().unwrap().text().collect::<String>();
     formated = formated.replace("\n","").replace("\t","");
     formated.push('\n');
-    println!("Outputing: {:?}", formated);
+    info!("Outputing: {:?}", formated);
     return formated;
 }
-//
+
+
 fn get_site_response() -> reqwest::Result<reqwest::Response>{
     reqwest::get("https://www.prefeitura.unicamp.br/apps/site/cardapio.php")
 }
@@ -163,97 +145,70 @@ fn get_menu() -> std::result::Result<String, ()>{
 
 }
 //
-//fn has_already_published_today(file: &mut File) -> bool {
-//    let today_as_number = time::now().tm_mday.to_string();
-//    let mut day_last_broadcast = String::new();
+fn has_already_published_today(file: &mut File) -> bool {
+    let today_as_number = time::now().tm_mday.to_string();
+    let mut day_last_broadcast = String::new();
+
+    file.read_to_string(&mut day_last_broadcast);
+
+    if day_last_broadcast == today_as_number {
+        return true;
+    }else {
+        return false;
+    }
+}
 //
-//    file.read_to_string(&mut day_last_broadcast);
-//
-//    if day_last_broadcast == today_as_number {
-//        return true;
-//    }else {
-//        return false;
-//    }
-//}
-//
-//fn broadcast_if_needed(api: &Api, path: &Path){
-//
-//
-//    let mut file =  OpenOptions::new()
-//        .create(true)
-//        .read(true)
-//        .write(true)
-//        .open(&path)
-//        .unwrap();
-//
-//    if has_already_published_today(&mut file){
-//        return;
-//    }else {
-//        broadcast(&api, get_menu().unwrap());
-//        let mut file = File::create(path).unwrap();
-//        file.write(time::now().tm_mday.to_string().as_bytes());
-//    }
-//}
-//
-//fn broadcast(api: &Api, message: String){
-//    api.send_message(
-//        75698394, // eu
-//        message,
-//        None,
-//        None,
-//        None,
-//        None,
-//    ).unwrap();
-//}
-//
-//fn handle_update(u: Update, thread_api: &Api) {
-//    info!("Got update: {:?}", u);
-//    let actual_message = match u.message {
-//        Some(m) => m,
-//        None => {
-//            info!("Got empty update");
-//            return;
-//        }
-//    };
-//    if actual_message.date < time::now().to_timespec().sec - 30 {
-//        info!("Message too old.");
-//        return;
-//    }
-//
-//    if !is_text_msg(&actual_message) {
-//        return;
-//    }
-//
-//    if get_msg_text(&actual_message).contains("/help") || get_msg_text(&actual_message).contains("/start") {
-//        let msg = ("Use /bandeco@BotejaoBot para receber o cardapio de hoje.");
-//        thread_api.send_message(
-//            actual_message.chat.id(),
-//            //        75698394, // eu
-//            msg.to_string(),
-//            None,
-//            None,
-//            None,
-//            None,
-//        ).unwrap();
-//        return;
-//    }
-//
-//    if !get_msg_text(&actual_message).contains("/bandeco") {
-//        info!("Got message {} which does not contain \"bandeco\"", get_msg_text(&actual_message));
-//        return;
-//    }
-//
-//    thread_api.send_message(
-//        actual_message.chat.id(),
-//        //        75698394, // eu
-//        get_menu().unwrap(),
-//        None,
-//        None,
-//        None,
-//        None,
-//    ).unwrap();
-//
-//}
+fn broadcast_if_needed(bot: &Bot, path: &Path, rep_chat_id: &i64){
+
+
+    let mut file =  OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap();
+
+    if has_already_published_today(&mut file){
+        return;
+    }else {
+        info!("Time to broadcast!");
+        let menu = get_menu();
+        match menu {
+            Ok(menu) => {
+                broadcast(&bot, menu, &rep_chat_id);
+                info!("Broadcast successful");
+            },
+            Err(e) => {
+                error!("Broadcast failed");
+                broadcast(&bot,
+                          "O site da prefeitura (https://www.prefeitura.unicamp.br/apps/site/cardapio.php) parece estar offline (ou a internet da rep caiu). Não pude pegar o cardápio. Tentarei de novo em 6 horas".to_string(),
+                          &rep_chat_id);
+                error!("Sleeping for 6 hours");
+                std::thread::sleep(    std::time::Duration::from_secs(60*60*6));
+                return;
+            }
+        }
+        let mut file = File::create(path).unwrap();
+        file.write(time::now().tm_mday.to_string().as_bytes());
+    }
+}
+
+fn broadcast(bot: &Bot, message: String, rep_chat_id: &i64){
+    let result = bot.send_message(
+        rep_chat_id,
+        &message,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    match result {
+        Ok(response) => info!("Successfully broadcast \n{:?}.", response),
+        Err(e) => error!("Failed to broadcast, got \n{:?} as response.", e)
+    }
+}
+
 fn main(){
     Logger::with_str("info")
         .log_to_file()
@@ -261,34 +216,50 @@ fn main(){
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
-    let bot_token = "454527929:AAHj82aCosGe1M8H6Wvohy0jznpkXLsjPq4".to_string();
+    let bot_token = env::var("TELEGRAM_BOT_ID")
+        .ok()
+        .expect("Can't find TELEGRAM_BOT_ID env variable")
+        .parse::<String>()
+        .unwrap();
+
+    let rep_chat_id = env::var("REP_CHAT_ID")
+        .ok()
+        .expect("Can't find REP_CHAT_ID env variable")
+        .parse::<i64>()
+        .unwrap();
 
 
     let two_sec = std::time::Duration::from_secs(2);
     let path = Path::new("last_day_when_broadcasted.txt");
     let mut dispatcher = Dispatcher::new();
     dispatcher.add_command_handler("bandejao", send_menu, false);
-    Updater::start(Some(bot_token), None, None, None, dispatcher);
+    dispatcher.add_command_handler("bandeco", send_menu, false);
+    dispatcher.add_command_handler("ru", send_menu, false);
 
+    const BASE_URL: &'static str = "https://api.telegram.org/bot";
 
-//    let thread_api = api.clone();
-//
-//    thread::spawn(move || {
-//        let mut updates_listener = thread_api.listener(ListeningMethod::LongPoll(None));
-//        updates_listener.listen(|u| {
-//            handle_update(u, &thread_api);
-//            Ok(ListeningAction::Continue)
-//        }).unwrap();
-//    });
-//
-//    while true {
-//        broadcast_if_needed(&api, &path);
-//        std::thread::sleep(two_sec);
-//    }
+    let bot_url = [BASE_URL, &bot_token].concat();
 
+    let bot = Bot::new(bot_url).unwrap();
+
+    thread::spawn(move || {
+        while true {
+            broadcast_if_needed(&bot, &path, &rep_chat_id);
+            std::thread::sleep(two_sec);
+        }
+    });
+
+    Updater::start(Some(bot_token.clone()), None, None, None, dispatcher);
 
 }
+
 fn send_menu(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-    info!("Got request for menu!");
-    bot.reply_to_message(&update, get_menu().unwrap().as_str()).unwrap();
+    info!("Got request for menu! {:?}", update);
+    info!("Replying to it");
+    let menu = get_menu().unwrap();
+    let response = bot.reply_to_message(&update, menu.as_str());
+    match response {
+        Ok(response) => info!("Successfully sent \n{:?}.", response),
+        Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e)
+    }
 }
