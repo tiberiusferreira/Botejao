@@ -5,7 +5,6 @@ extern crate teleborg;
 extern crate encoding;
 extern crate reqwest;
 #[macro_use]
-extern crate error_chain;
 extern crate scraper;
 use encoding::{Encoding, DecoderTrap};
 use encoding::all::ISO_8859_1;
@@ -15,30 +14,32 @@ extern crate time;
 use std::fs::File;
 use std::path::Path;
 extern crate flexi_logger;
-use std::io::Seek;
-use std::io::SeekFrom;
 #[macro_use]
 extern crate log;
 use std::thread;
-use teleborg::{Dispatcher, Bot, Updater};
-use teleborg::objects::Update;
+use teleborg::{Dispatcher, Bot, Updater, ParseMode};
+use teleborg::objects::{Update, Message};
+use teleborg::error;
 use flexi_logger::Logger;
 use scraper::{Selector, Html};
 use std::fs::OpenOptions;
 use std::env;
 
 
-fn remove_spaces_and_tabs(selector: &Selector, fragment: &Html) -> String {
-    let mut formated = fragment.select(&selector).next().unwrap().text().collect::<String>();
-    formated = formated.replace("\n","").replace("\t","");
-    formated.push('\n');
-    info!("Outputing: {:?}", formated);
-    return formated;
+fn remove_spaces_and_tabs(input: String) -> String {
+    let mut input = input.replace("\n","").replace("\t","");
+    input.push('\n');
+    info!("Outputing: {:?}", input);
+    return input;
+}
+
+fn apply_selectors(selector: &Selector, fragment: &Html) -> String{
+    fragment.select(&selector).next().unwrap().text().collect::<String>()
 }
 
 
-fn get_site_response() -> reqwest::Result<reqwest::Response>{
-    reqwest::get("https://www.prefeitura.unicamp.br/apps/site/cardapio.php")
+fn get_site_response(site :String) -> reqwest::Result<reqwest::Response>{
+    reqwest::get(site.as_str())
 }
 
 fn filter_response(resp: &mut reqwest::Response) -> std::result::Result<String, String> {
@@ -57,81 +58,82 @@ fn filter_response(resp: &mut reqwest::Response) -> std::result::Result<String, 
     }
     let fragment = Html::parse_fragment(&body_str);
 
+    let day_selector = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > p").unwrap();
 
     let selector_breakfast = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(2)").unwrap();
-    let selector_lunch_1 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(1) > td").unwrap();
-    let selector_lunch_2 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(2) > td").unwrap();
-    let selector_lunch_3 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(3) > td").unwrap();
-    let selector_lunch_4 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td").unwrap();
-    let selector_lunch_5 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(5) > td").unwrap();
-    let selector_lunch_6 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(6) > td").unwrap();
-
-    let selector_veg_lunch_1 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(1) > td").unwrap();
-    let selector_veg_lunch_2 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(2) > td").unwrap();
-    let selector_veg_lunch_4 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(4) > td").unwrap();
-    let selector_veg_lunch_5 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(5) > td").unwrap();
-    let selector_veg_lunch_6 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(6) > td").unwrap();
 
 
-    let selector_dinner_1 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(1) > td").unwrap();
-    let selector_dinner_2 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(2) > td").unwrap();
-    let selector_dinner_3 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(3) > td").unwrap();
-    let selector_dinner_4 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(4) > td").unwrap();
-    let selector_dinner_5 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(5) > td").unwrap();
-    let selector_dinner_6 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(6) > td").unwrap();
+    let mut lunch_selectors = Vec::new();
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(1) > td").unwrap());
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(2) > td").unwrap());
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(3) > td").unwrap());
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td").unwrap());
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(5) > td").unwrap());
+    lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(6) > td").unwrap());
 
-    let selector_veg_dinner_1 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(1) > td").unwrap();
-    let selector_veg_dinner_2 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(2) > td").unwrap();
-    let selector_veg_dinner_4 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(4) > td").unwrap();
-    let selector_veg_dinner_5 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(5) > td").unwrap();
-    let selector_veg_dinner_6 = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(6) > td").unwrap();
+    let mut veg_lunch_selectors = Vec::new();
 
-    let mut cafe_da_manha = String::from("Café da Manha: \n");
-    cafe_da_manha.push_str(remove_spaces_and_tabs(&selector_breakfast, &fragment).as_str());
+    veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(1) > td").unwrap());
+    veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(2) > td").unwrap());
+    veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(4) > td").unwrap());
+    veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(5) > td").unwrap());
+    veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(6) > td").unwrap());
 
+    let mut dinner_selectors = Vec::new();
 
-    let mut lunch = String::from("Almoço: \n");
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_1, &fragment).as_str());
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_2, &fragment).as_str());
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_3, &fragment).as_str());
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_4, &fragment).as_str());
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_5, &fragment).as_str());
-    lunch.push_str(remove_spaces_and_tabs(&selector_lunch_6, &fragment).as_str());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(1) > td").unwrap());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(2) > td").unwrap());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(3) > td").unwrap());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(4) > td").unwrap());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(5) > td").unwrap());
+    dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(6) > td").unwrap());
 
+    let mut veg_dinner_selectors = Vec::new();
+    veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(1) > td").unwrap());
+    veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(2) > td").unwrap());
+    veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(4) > td").unwrap());
+    veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(5) > td").unwrap());
+    veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(6) > td").unwrap());
 
-    let mut lunch_veg = String::from("Almoço Vegetariano: \n");
-    lunch_veg.push_str(remove_spaces_and_tabs(&selector_veg_lunch_1, &fragment).as_str());
-    lunch_veg.push_str(remove_spaces_and_tabs(&selector_veg_lunch_2, &fragment).as_str());
-    lunch_veg.push_str(remove_spaces_and_tabs(&selector_veg_lunch_4, &fragment).as_str());
-    lunch_veg.push_str(remove_spaces_and_tabs(&selector_veg_lunch_5, &fragment).as_str());
-    lunch_veg.push_str(remove_spaces_and_tabs(&selector_veg_lunch_6, &fragment).as_str());
+    let mut cafe_da_manha = String::from("*Café da Manha:* \n");
 
+    let extracted_break_fast = apply_selectors(&selector_breakfast, &fragment);
 
+    cafe_da_manha.push_str(remove_spaces_and_tabs(extracted_break_fast).as_str());
 
-    let mut dinner = String::from("Jantar: \n");
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_1, &fragment).as_str());
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_2, &fragment).as_str());
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_3, &fragment).as_str());
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_4, &fragment).as_str());
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_5, &fragment).as_str());
-    dinner.push_str(remove_spaces_and_tabs(&selector_dinner_6, &fragment).as_str());
+    let extracted_day = apply_selectors(&day_selector, &fragment);
 
-
-    let mut dinner_veg = String::from("Jantar Vegetariano: \n");
-    dinner_veg.push_str(remove_spaces_and_tabs(&selector_veg_dinner_1, &fragment).as_str());
-    dinner_veg.push_str(remove_spaces_and_tabs(&selector_veg_dinner_2, &fragment).as_str());
-    dinner_veg.push_str(remove_spaces_and_tabs(&selector_veg_dinner_4, &fragment).as_str());
-    dinner_veg.push_str(remove_spaces_and_tabs(&selector_veg_dinner_5, &fragment).as_str());
-    dinner_veg.push_str(remove_spaces_and_tabs(&selector_veg_dinner_6, &fragment).as_str());
+    let day = format!("*{}*", remove_spaces_and_tabs(extracted_day));
 
 
-    return Ok(format!("{}\n{}\n{}\n{}", lunch, dinner, lunch_veg, dinner_veg));
+    let mut lunch = String::from("*Almoço:* \n");
 
+    for selector in &lunch_selectors{
+        lunch.push_str(remove_spaces_and_tabs(apply_selectors(selector, &fragment)).as_str());
+    }
+
+    let mut lunch_veg = String::from("*Almoço Vegetariano:* \n");
+
+    for selector in &veg_lunch_selectors{
+        lunch_veg.push_str(remove_spaces_and_tabs(apply_selectors(selector, &fragment)).as_str());
+    }
+    let mut dinner = String::from("*Jantar:* \n");
+
+    for selector in &dinner_selectors{
+        dinner.push_str(remove_spaces_and_tabs(apply_selectors(selector, &fragment)).as_str());
+    }
+
+    let mut dinner_veg = String::from("*Jantar Vegetariano: *\n");
+
+    for selector in &veg_dinner_selectors{
+        dinner_veg.push_str(remove_spaces_and_tabs(apply_selectors(selector, &fragment)).as_str());
+    }
+    return Ok(format!("{}\n {}\n{}\n{}\n{}", day, lunch, dinner, lunch_veg, dinner_veg));
 }
 //
-fn get_menu() -> std::result::Result<String, ()>{
+fn get_menu(site: String) -> std::result::Result<String, ()>{
     let mut resp =
-        match get_site_response(){
+        match get_site_response(site){
             Ok(response) => response,
             Err(e) => {
                 error!("Could not get site error: {}", e);
@@ -160,7 +162,6 @@ fn has_already_published_today(file: &mut File) -> bool {
 //
 fn broadcast_if_needed(bot: &Bot, path: &Path, rep_chat_id: &i64){
 
-
     let mut file =  OpenOptions::new()
         .create(true)
         .read(true)
@@ -172,7 +173,7 @@ fn broadcast_if_needed(bot: &Bot, path: &Path, rep_chat_id: &i64){
         return;
     }else {
         info!("Time to broadcast!");
-        let menu = get_menu();
+        let menu = get_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string());
         match menu {
             Ok(menu) => {
                 broadcast(&bot, menu, &rep_chat_id);
@@ -197,7 +198,7 @@ fn broadcast(bot: &Bot, message: String, rep_chat_id: &i64){
     let result = bot.send_message(
         rep_chat_id,
         &message,
-        None,
+        Some(&ParseMode::Markdown),
         None,
         None,
         None,
@@ -253,11 +254,18 @@ fn main(){
 
 }
 
+pub fn reply_to_message_as_markdown(bot: &Bot, update: &Update, text: &str) -> Result<teleborg::objects::Message, teleborg::error::Error> {
+    let message = update.clone().message.unwrap();
+    let message_id = message.message_id;
+    let chat_id = message.chat.id;
+    bot.send_message(&chat_id, text, Some(&ParseMode::Markdown), None, None, Some(&message_id), None)
+}
+
 fn send_menu(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
     info!("Got request for menu! {:?}", update);
     info!("Replying to it");
-    let menu = get_menu().unwrap();
-    let response = bot.reply_to_message(&update, menu.as_str());
+    let menu = get_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()).unwrap();
+    let response = reply_to_message_as_markdown(&bot, &update, menu.as_str());
     match response {
         Ok(response) => info!("Successfully sent \n{:?}.", response),
         Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e)
