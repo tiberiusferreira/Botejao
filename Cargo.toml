@@ -3,6 +3,15 @@ name = "Botejao"
 version = "0.1.0"
 authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
 
+[lib]
+name = "botejao"
+path = "src/botejao/mod.rs"
+
+[[bin]]
+name = "botejao"
+path = "src/bin.rs"
+
+
 [dependencies]
 scraper = "*"
 error-chain = "*"
