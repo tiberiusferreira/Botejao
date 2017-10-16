@@ -24,7 +24,7 @@ pub struct Botejao {
     path_to_last_menu_file: PathBuf,
     bot_dispatcher: Dispatcher,
     bot_token: String,
-    base_bot_url: String
+    base_bot_url: String,
 }
 
 impl Botejao{
@@ -56,6 +56,9 @@ impl Botejao{
         self.bot_dispatcher.add_command_handler("bandejao", Botejao::send_menu, false);
         self.bot_dispatcher.add_command_handler("bandeco", Botejao::send_menu, false);
         self.bot_dispatcher.add_command_handler("ru", Botejao::send_menu, false);
+        self.bot_dispatcher.add_command_handler("help", Botejao::send_help, false);
+        self.bot_dispatcher.add_command_handler("ajuda", Botejao::send_help, false);
+        self.bot_dispatcher.add_command_handler("start", Botejao::send_help, false);
         Updater::start(Some(self.bot_token.clone()), None, None, None, self.bot_dispatcher);
     }
 
@@ -70,6 +73,19 @@ impl Botejao{
         }
     }
 
+
+    fn send_help(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
+        info!("Got request for help! {:?}", update);
+        info!("Replying to it");
+        let help_msg = "Esse bot retorna o menu do restaurante universitario da UNICAMP. Use o comando /ru@BotejaoBot para testa-lo.";
+        let response = Botejao::reply_to_message_as_markdown(&bot, &update, help_msg);
+        match response {
+            Ok(response) => info!("Successfully sent \n{:?}.", response),
+            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", help_msg, e)
+        }
+    }
+
+
     pub fn reply_to_message_as_markdown(bot: &Bot, update: &Update, text: &str) -> Result<teleborg::objects::Message, teleborg::error::Error> {
         let message = update.clone().message.unwrap();
         let message_id = message.message_id;
@@ -80,7 +96,6 @@ impl Botejao{
     fn remove_spaces_and_tabs(input: String) -> String {
         let mut input = input.replace("\n","").replace("\t","");
         input.push('\n');
-//        info!("Outputing: {:?}", input);
         return input;
     }
 
