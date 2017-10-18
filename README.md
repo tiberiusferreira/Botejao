@@ -1,8 +1,9 @@
 # Botejao
-A telegram bot which sends the menu of UNICAMP's restaurant to a group.
+A telegram bot which sends UNICAMP's restaurant menu to a Telegram group.
+
+This is mainly a "toy" project to teach me Rust and get people involved with Telegram. 
 
 Planned features:
-
 
 - [ ] Support for USP 
 - [ ] Support for UFRGS
