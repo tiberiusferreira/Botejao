@@ -8,6 +8,4 @@ name = "test"
 path = "src/main.rs"
 
 [dependencies]
-fantoccini = "0.7.2"
-tokio-core = "*"
-futures = "*"
+webdriver_client = "0.1.0"

@@ -1,47 +1,21 @@
+extern crate webdriver_client;
 
-extern crate tokio_core;
-extern crate futures;
-extern crate fantoccini;
-use fantoccini::Client;
-use futures::future::Future;
+use std::sync::{Once, ONCE_INIT};
+use std::thread::sleep;
+use std::time::Duration;
+use webdriver_client::{Driver};
+use webdriver_client::firefox::GeckoDriver;
+use webdriver_client::messages::ExecuteCmd;
+use webdriver_client::messages::LocationStrategy;
 fn main() {
+    let gecko = GeckoDriver::build()
+        .firefox_binary("/usr/bin/firefox")
+        .spawn().unwrap();
+    let sess = gecko.session().unwrap();
+    let site =sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6").unwrap();
+    let six_sec = std::time::Duration::from_secs(2);
+    std::thread::sleep(six_sec);
 
-    let mut core = tokio_core::reactor::Core::new().unwrap();
+    println!("{:?}", sess.find_element("#almocoTerca", LocationStrategy::Css).unwrap().text().unwrap());
 
-    let (c, fin) = Client::new("http://localhost:4444", &core.handle());
-    let c = core.run(c).unwrap();
-
-    {
-        // we want to have a reference to c so we can use it in the and_thens below
-        let c = & c;
-
-        // now let's set up the sequence of steps we want the browser to take
-        // first, go to the Wikipedia page for Foobar
-        let f = c.goto("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6")
-            .and_then( move |_| {
-                                let three_sec = std::time::Duration::from_secs(3);
-                                std::thread::sleep(three_sec);
-                c.by_selector("#almocoSegunda")
-            })
-            .and_then(move |rsl| {
-                rsl.text()
-            }
-            ).and_then(move |text| {
-            println!("{}",text);
-            Ok(())
-        });
-
-
-
-
-
-
-        // and set the browser off to do those things
-        core.run(f).unwrap();
-    }
-
-    // drop the client to delete the browser session
-    drop(c);
-    // and wait for cleanup to finish
-    core.run(fin).unwrap();
 }
