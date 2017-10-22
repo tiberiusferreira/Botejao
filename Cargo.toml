@@ -1,0 +1,13 @@
+[package]
+name = "webdriver"
+version = "0.1.0"
+authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
+
+[[bin]]
+name = "test"
+path = "src/main.rs"
+
+[dependencies]
+fantoccini = "0.7.2"
+tokio-core = "*"
+futures = "*"
