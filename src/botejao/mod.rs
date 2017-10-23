@@ -3,6 +3,7 @@ extern crate teleborg;
 extern crate scraper;
 extern crate encoding;
 extern crate reqwest;
+extern crate webdriver_client;
 #[macro_use]
 extern crate log;
 extern crate flexi_logger;
@@ -14,11 +15,15 @@ use std::io::{Read, Write};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::thread;
-use teleborg::{Dispatcher, Bot, Updater, ParseMode};
+use teleborg::{Dispatcher, Bot, Updater, ParseMode, Command};
 use teleborg::objects::{Update};
 use scraper::{Selector, Html};
 use std::fs::OpenOptions;
-
+use webdriver_client::{Driver};
+use webdriver_client::firefox::GeckoDriver;
+use webdriver_client::messages::ExecuteCmd;
+use webdriver_client::messages::LocationStrategy;
+use webdriver_client::DriverSession;
 pub struct Botejao {
     broadcast_groups: Vec<i64>,
     path_to_last_menu_file: PathBuf,
@@ -27,7 +32,47 @@ pub struct Botejao {
     base_bot_url: String,
 }
 
+impl teleborg::Command for Botejao{
+    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+        self.test(bot, update, args);
+    }
+}
+
+struct FirefoxHandler {
+    geckodriver: GeckoDriver
+}
+impl FirefoxHandler {
+    fn test(&self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+        bot.reply_to_message(&update, "It works!");
+    }
+    pub fn post_to_usp(&self, bot: &Bot, update: Update, args: Option<Vec<&str>>){
+        let gecko = GeckoDriver::build()
+            .firefox_binary("/Applications/Firefox.app/Contents/MacOS/firefox-bin")
+            .spawn().unwrap();
+        let sess = gecko.session().unwrap();
+        let site =sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6").unwrap();
+        let two = std::time::Duration::from_secs(2);
+        std::thread::sleep(two);
+
+        println!("{:?}", sess.find_element("#almocoTerca", LocationStrategy::Css).unwrap().text().unwrap());
+        let menu = sess.find_element("#almocoTerca", LocationStrategy::Css).unwrap().text().unwrap();
+        let response = Botejao::reply_to_message_as_markdown(&bot, &update, menu.as_str());
+        match response {
+            Ok(response) => info!("Successfully sent \n{:?}.", response),
+            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e)
+        }
+
+    }
+}
+
+impl teleborg::Command for FirefoxHandler {
+    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+        self.post_to_usp(bot, update, args);
+    }
+}
+
 impl Botejao{
+
 
     pub fn new(bot_token: String, broadcast_groups: Vec<i64>, path_to_last_menu_file: PathBuf) -> Botejao {
         return Botejao{
@@ -35,7 +80,7 @@ impl Botejao{
             path_to_last_menu_file,
             bot_dispatcher: Dispatcher::new(),
             bot_token,
-            base_bot_url: "https://api.telegram.org/bot".to_string()
+            base_bot_url: "https://api.telegram.org/bot".to_string(),
         }
     }
 
@@ -52,20 +97,40 @@ impl Botejao{
                 std::thread::sleep(one_hour);
             }
         });
+        let firefox_handler = FirefoxHandler {
+            geckodriver: GeckoDriver::build()
+                .firefox_binary("/Applications/Firefox.app/Contents/MacOS/firefox-bin")
+                .spawn().unwrap()
+        };
 
-        self.bot_dispatcher.add_command_handler("bandejao", Botejao::send_menu, false);
-        self.bot_dispatcher.add_command_handler("bandeco", Botejao::send_menu, false);
-        self.bot_dispatcher.add_command_handler("ru", Botejao::send_menu, false);
+        self.bot_dispatcher.add_command_handler("unicamp", Botejao::send_unicamp_menu, false);
+        self.bot_dispatcher.add_command_handler("usp_central", Botejao::send_usp_central_menu, false);
+        self.bot_dispatcher.add_command_handler("usp_central", firefox_handler, false);
         self.bot_dispatcher.add_command_handler("help", Botejao::send_help, false);
         self.bot_dispatcher.add_command_handler("ajuda", Botejao::send_help, false);
         self.bot_dispatcher.add_command_handler("start", Botejao::send_help, false);
         Updater::start(Some(self.bot_token.clone()), None, None, None, self.bot_dispatcher);
     }
 
-    fn send_menu(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for menu! {:?}", update);
+    fn test(&self, bot: &Bot, update: Update, _: Option<Vec<&str>>) {
+        println!("Works!");
+    }
+
+    fn send_unicamp_menu(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
+        info!("Got request for unicamps menu! {:?}", update);
         info!("Replying to it");
-        let menu = Botejao::get_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()).unwrap();
+        let menu = Botejao::get_unicamp_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()).unwrap();
+        let response = Botejao::reply_to_message_as_markdown(&bot, &update, menu.as_str());
+        match response {
+            Ok(response) => info!("Successfully sent \n{:?}.", response),
+            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e)
+        }
+    }
+
+    fn send_usp_central_menu(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
+        info!("Got request for usps menu! {:?}", update);
+        info!("Replying to it");
+        let menu = Botejao::get_usp_central_menu("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6".to_string()).unwrap();
         let response = Botejao::reply_to_message_as_markdown(&bot, &update, menu.as_str());
         match response {
             Ok(response) => info!("Successfully sent \n{:?}.", response),
@@ -77,7 +142,7 @@ impl Botejao{
     fn send_help(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
         info!("Got request for help! {:?}", update);
         info!("Replying to it");
-        let help_msg = "Esse bot retorna o menu do restaurante universitario da UNICAMP. Use o comando /ru@BotejaoBot para testa-lo.";
+        let help_msg = "Esse bot retorna o menu de restaurantes universitarios. Use o comando /ru@BotejaoBot para testa-lo.";
         let response = Botejao::reply_to_message_as_markdown(&bot, &update, help_msg);
         match response {
             Ok(response) => info!("Successfully sent \n{:?}.", response),
@@ -108,7 +173,21 @@ impl Botejao{
         reqwest::get(site.as_str())
     }
 
-    fn filter_response(resp: &mut reqwest::Response) -> std::result::Result<String, String> {
+    fn post_to_usp(){
+        let gecko = GeckoDriver::build()
+            .firefox_binary("/Applications/Firefox.app/Contents/MacOS/firefox-bin")
+            .spawn().unwrap();
+        let sess = gecko.session().unwrap();
+        let site =sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6").unwrap();
+        let two = std::time::Duration::from_secs(2);
+        std::thread::sleep(two);
+
+        println!("{:?}", sess.find_element("#almocoTerca", LocationStrategy::Css).unwrap().text().unwrap());
+
+
+    }
+
+    fn filter_unicamp_response(resp: &mut reqwest::Response) -> std::result::Result<String, String> {
         let mut body = Vec::new();
         let body_str;
 
@@ -196,7 +275,96 @@ impl Botejao{
         }
         return Ok(format!("{}\n {}\n{}\n{}\n{}", day, lunch, dinner, lunch_veg, dinner_veg));
     }
-    fn get_menu(site: String) -> std::result::Result<String, ()>{
+
+    fn filter_usp_central_response(resp: &mut reqwest::Response) -> std::result::Result<String, String> {
+        let mut body = Vec::new();
+        let body_str;
+
+        match resp.read_to_end(&mut body) {
+            Ok(_) => {
+                body_str = ISO_8859_1.decode(&*body, DecoderTrap::Strict).unwrap();
+            },
+            Err(e) => {
+                return Err(format!("Error reading site response {}", e));
+            }
+        }
+        println!("{}", body_str);
+        let fragment = Html::parse_fragment(&body_str);
+
+        let day_selector = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > p").unwrap();
+
+        let selector_breakfast = Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(2)").unwrap();
+
+
+        let mut lunch_selectors = Vec::new();
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(1) > td").unwrap());
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(2) > td").unwrap());
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(3) > td").unwrap());
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td").unwrap());
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(5) > td").unwrap());
+        lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(6) > td").unwrap());
+
+        let mut veg_lunch_selectors = Vec::new();
+
+        veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(1) > td").unwrap());
+        veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(2) > td").unwrap());
+        veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(4) > td").unwrap());
+        veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(5) > td").unwrap());
+        veg_lunch_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(6) > td").unwrap());
+
+        let mut dinner_selectors = Vec::new();
+
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(1) > td").unwrap());
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(2) > td").unwrap());
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(3) > td").unwrap());
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(4) > td").unwrap());
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(5) > td").unwrap());
+        dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(6) > td").unwrap());
+
+        let mut veg_dinner_selectors = Vec::new();
+        veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(1) > td").unwrap());
+        veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(2) > td").unwrap());
+        veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(4) > td").unwrap());
+        veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(5) > td").unwrap());
+        veg_dinner_selectors.push(Selector::parse("#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(6) > td").unwrap());
+
+        let mut cafe_da_manha = String::from("*Café da Manha:* \n");
+
+        let extracted_break_fast = Botejao::apply_selectors(&selector_breakfast, &fragment);
+
+        cafe_da_manha.push_str(Botejao::remove_spaces_and_tabs(extracted_break_fast).as_str());
+
+        let extracted_day = Botejao::apply_selectors(&day_selector, &fragment);
+
+        let day = format!("*{}*", Botejao::remove_spaces_and_tabs(extracted_day));
+
+
+        let mut lunch = String::from("*Almoço:* \n");
+
+        for selector in &lunch_selectors{
+            lunch.push_str(Botejao::remove_spaces_and_tabs(Botejao::apply_selectors(selector, &fragment)).as_str());
+        }
+
+        let mut lunch_veg = String::from("*Almoço Vegetariano:* \n");
+
+        for selector in &veg_lunch_selectors{
+            lunch_veg.push_str(Botejao::remove_spaces_and_tabs(Botejao::apply_selectors(selector, &fragment)).as_str());
+        }
+        let mut dinner = String::from("*Jantar:* \n");
+
+        for selector in &dinner_selectors{
+            dinner.push_str(Botejao::remove_spaces_and_tabs(Botejao::apply_selectors(selector, &fragment)).as_str());
+        }
+
+        let mut dinner_veg = String::from("*Jantar Vegetariano: *\n");
+
+        for selector in &veg_dinner_selectors{
+            dinner_veg.push_str(Botejao::remove_spaces_and_tabs(Botejao::apply_selectors(selector, &fragment)).as_str());
+        }
+        return Ok(format!("{}\n {}\n{}\n{}\n{}", day, lunch, dinner, lunch_veg, dinner_veg));
+    }
+
+    fn get_unicamp_menu(site: String) -> std::result::Result<String, ()>{
         let mut resp =
             match Botejao::get_site_response(site){
                 Ok(response) => response,
@@ -205,19 +373,38 @@ impl Botejao{
                     return Err(());
                 }
             };
-        return match Botejao::filter_response(&mut resp){
+        return match Botejao::filter_unicamp_response(&mut resp){
             Ok(menu) => Ok(menu),
             Err(_) => Err(())
         }
 
     }
+
+    fn get_usp_central_menu(site: String) -> std::result::Result<String, ()>{
+        //        let mut resp =
+        //            match Botejao::get_site_response(site){
+        //                Ok(response) => response,
+        //                Err(e) => {
+        //                    error!("Could not get site error: {}", e);
+        //                    return Err(());
+        //                }
+        //            };
+        //        return match Botejao::filter_usp_central_response(&mut resp){
+        //            Ok(menu) => Ok(menu),
+        //            Err(_) => Err(())
+        //        }
+        Botejao::post_to_usp();
+        Ok("a".to_string())
+
+    }
+
     fn needs_to_publish(menu: &str, path_to_last_menu_file: &Path) -> bool {
         return  menu != Botejao::read_menu_from_file(path_to_last_menu_file);
     }
     fn broadcast_if_needed(bot: &Bot, path_to_last_menu_file: &Path, rep_chat_id: &i64){
 
         let menu =
-            match Botejao::get_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()){
+            match Botejao::get_unicamp_menu("https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()){
                 Ok(menu) => menu,
                 Err(_) => {
                     error!("Could not load menu from site");

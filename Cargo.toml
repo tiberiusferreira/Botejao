@@ -2,17 +2,19 @@
 name = "Botejao"
 version = "0.1.0"
 authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
-
-[lib]
-name = "botejao"
-path = "src/botejao/mod.rs"
-
 [[bin]]
 name = "botejao"
 path = "src/bin.rs"
 
 
+[lib]
+name = "botejao"
+path = "src/botejao/mod.rs"
+
+
+
 [dependencies]
+webdriver_client = "0.1.0"
 scraper = "*"
 error-chain = "*"
 flexi_logger = "*"

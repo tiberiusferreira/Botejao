@@ -1,0 +1,12 @@
+
+.DS_Store
+.idea/
+Cargo.lock
+botejao.iml
+cardapio.txt
+env-file.list
+last_day_when_broadcasted.txt
+log_files/
+lorem_ipsum.txt
+src/.DS_Store
+target/

@@ -34,6 +34,8 @@ fn main(){
                                vec![rep_chat_id],
                                path.to_path_buf());
 
+
+
     botejao.start();
 
 
