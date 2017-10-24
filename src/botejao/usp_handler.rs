@@ -9,9 +9,12 @@ use webdriver_client::{Driver, DriverSession};
 use webdriver_client::messages::LocationStrategy;
 use std;
 use time;
+use std::time::Instant;
 pub struct UspHandler {
     geckodriver: GeckoDriver,
-    menu_website: String
+    menu_website: String,
+    cached_response: String,
+    time_when_cache_was_updated: std::time::Instant,
 }
 
 impl Command for UspHandler {
@@ -27,39 +30,62 @@ impl UspHandler {
             geckodriver: GeckoDriver::build()
                 .firefox_binary("/usr/bin/firefox")
                 .spawn().unwrap(),
-            menu_website: "https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6".to_string()
+            menu_website: "https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6".to_string(),
+            cached_response: "".to_string(),
+            time_when_cache_was_updated: Instant::now()
         }
     }
-    pub fn post_to_usp(&self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+    pub fn post_to_usp(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
         info!("Got request for USPs menu!");
-        info!("Opening session!");
-        let sess = self.geckodriver.session().unwrap();
-        info!("Going to site!");
-        sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6")
-            .unwrap();
-        for i in 0..10 {
-            if UspHandler::site_loaded(&sess){
-                info!("Parsing site!");
-                let menu = UspHandler::get_todays_menu_formated(time::now().tm_wday, &sess);
-                info!("Replying!");
+        if Instant::now().duration_since(self.time_when_cache_was_updated).as_secs() < 1800 &&
+            !self.cached_response.is_empty() {
+            info!("Sending cached response");
+            let response = UspHandler::reply_to_message_as_markdown(&bot, &update, self.cached_response.as_str());
+            match response {
+                Ok(response) => info!("Successfully sent \n{:?}.", response),
+                Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", self.cached_response, e),
+            }
+            return;
+        }
+        let mut menu = String::new();
+        {
+            info!("Opening session!");
+            let sess = self.geckodriver.session().unwrap();
+            info!("Going to site!");
+            sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6")
+                .unwrap();
 
-                let response = UspHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());
-                match response {
-                    Ok(response) => info!("Successfully sent \n{:?}.", response),
-                    Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e),
+            for i in 0..15 {
+                if UspHandler::site_loaded(&sess) {
+                    info!("Parsing site!");
+                    menu = UspHandler::get_todays_menu_formated(time::now().tm_wday, &sess);
+                    info!("Replying!");
+                    let response = UspHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());
+                    match response {
+                        Ok(response) => info!("Successfully sent \n{:?}.", response),
+                        Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e),
+                    }
+                    break;
+                } else {
+                    info!("Sleeping for 500 ms for the {} time!", i);
+                    let quarter_sec = std::time::Duration::from_millis(500);
+                    std::thread::sleep(quarter_sec);
                 }
-                return;
-            }else {
-                info!("Sleeping for 500 ms for the {} time!", i);
-                let quarter_sec = std::time::Duration::from_millis(500);
-                std::thread::sleep(quarter_sec);
             }
         }
+        if !menu.is_empty(){
+            info!("Updating response cache");
+            self.update_cached_response(menu);
+        }else {
+            error!("Could not load site, timeout");
+        }
 
-        error!("Could not load site, timeout");
 
+    }
 
-
+    fn update_cached_response(&mut self, new_response: String){
+        self.cached_response = new_response;
+        self.time_when_cache_was_updated = Instant::now();
     }
 
     fn site_loaded(session: &DriverSession) -> bool{
