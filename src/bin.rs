@@ -2,14 +2,12 @@ extern crate botejao;
 extern crate flexi_logger;
 extern crate log;
 use botejao::Botejao;
-use std::path::Path;
 use flexi_logger::{opt_format, Logger};
 use std::env;
 
 
 
 fn main() {
-    const LAST_DAY_WHEN_BROADCASTED_PATH: &str = "last_day_when_broadcasted.txt";
     Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
@@ -23,16 +21,7 @@ fn main() {
         .parse::<String>()
         .unwrap();
 
-    let rep_chat_id = env::var("REP_CHAT_ID")
-        .ok()
-        .expect("Can't find REP_CHAT_ID env variable")
-        .parse::<i64>()
-        .unwrap();
-
-    let path = Path::new(LAST_DAY_WHEN_BROADCASTED_PATH);
     let botejao = Botejao::new(bot_token.clone());
-
-
 
     botejao.start();
 }

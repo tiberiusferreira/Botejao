@@ -35,12 +35,12 @@ impl UspHandler {
         info!("Opening session!");
         let sess = self.geckodriver.session().unwrap();
         info!("Going to site!");
-        let site = sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6")
+        sess.go("https://uspdigital.usp.br/rucard/Jsp/cardapioSAS.jsp?codrtn=6")
             .unwrap();
-        for i in 0..8 {
+        for i in 0..10 {
             if UspHandler::site_loaded(&sess){
                 info!("Parsing site!");
-                let menu = UspHandler::get_todays_lunch_menu_from_site(time::now().tm_wday, &sess);
+                let menu = UspHandler::get_todays_menu_formated(time::now().tm_wday, &sess);
                 info!("Replying!");
 
                 let response = UspHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());
@@ -48,9 +48,10 @@ impl UspHandler {
                     Ok(response) => info!("Successfully sent \n{:?}.", response),
                     Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e),
                 }
+                return;
             }else {
-                info!("Sleeping for 250 ms for the {} time!", i);
-                let quarter_sec = std::time::Duration::from_millis(250);
+                info!("Sleeping for 500 ms for the {} time!", i);
+                let quarter_sec = std::time::Duration::from_millis(500);
                 std::thread::sleep(quarter_sec);
             }
         }
@@ -67,44 +68,32 @@ impl UspHandler {
             .text()
             .unwrap().is_empty();
     }
-    pub fn get_todays_lunch_menu_from_site(day_since_sunday: i32, session: &DriverSession) -> String{
+    pub fn get_todays_menu_formated(day_since_sunday: i32, session: &DriverSession) -> String{
         match  day_since_sunday {
-            1 => format!("*{}*:\n{}" , session.find_element("#diaSegunda", LocationStrategy::Css)
-                .unwrap()
-                .text()
-                .unwrap(), session.find_element("#almocoSegunda", LocationStrategy::Css)
-                             .unwrap()
-                             .text()
-                             .unwrap()),
-            2 => format!("*{}* \n {}" , session.find_element("#diaTerca", LocationStrategy::Css)
-                .unwrap()
-                .text()
-                .unwrap(), session.find_element("#almocoTerca", LocationStrategy::Css)
-                             .unwrap()
-                             .text()
-                             .unwrap()),
-            3 => format!("*{}* \n {}" , session.find_element("#diaQuarta", LocationStrategy::Css)
-                .unwrap()
-                .text()
-                .unwrap(), session.find_element("#almocoQuarta", LocationStrategy::Css)
-                             .unwrap()
-                             .text()
-                             .unwrap()),
-            4 => format!("*{}* \n {}" , session.find_element("#diaQuinta", LocationStrategy::Css)
-                .unwrap()
-                .text()
-                .unwrap(), session.find_element("#almocoQuinta", LocationStrategy::Css)
-                             .unwrap()
-                             .text()
-                             .unwrap()),
-            5 => format!("*{}* \n {}" , session.find_element("#diaSexta", LocationStrategy::Css)
-                .unwrap()
-                .text()
-                .unwrap(), session.find_element("#almocoSexta", LocationStrategy::Css)
-                             .unwrap()
-                             .text()
-                             .unwrap()),
-            _ => "".to_string()
+            1 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaSegunda", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoSegunda", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarSegunda", LocationStrategy::Css).unwrap().text().unwrap()),
+            2 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaTerca", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoTerca", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarTerca", LocationStrategy::Css).unwrap().text().unwrap()),
+            3 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaQuarta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoQuarta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarQuarta", LocationStrategy::Css).unwrap().text().unwrap()),
+            4 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaQuinta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoQuinta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarQuinta", LocationStrategy::Css).unwrap().text().unwrap()),
+            5 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaSexta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoSexta", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarSexta", LocationStrategy::Css).unwrap().text().unwrap()),
+            _ => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,
+                         session.find_element("#diaSegunda", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#almocoSegunda", LocationStrategy::Css).unwrap().text().unwrap(),
+                         session.find_element("#jantarSegunda", LocationStrategy::Css).unwrap().text().unwrap())
         }
     }
 
