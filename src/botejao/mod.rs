@@ -18,10 +18,13 @@ use std::path::{PathBuf};
 use teleborg::{Bot, Dispatcher, ParseMode, Updater};
 use teleborg::objects::Update;
 use scraper::{Selector};
-use usp_handler::UspHandler;
+use usp_handler::ArcUspHandler;
+use std::thread;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 pub struct Botejao {
     unicamp_handler: UnicampHandler,
-    usp_handler: UspHandler,
+    usp_handler: ArcUspHandler,
     bot_dispatcher: Dispatcher,
     bot_token: String,
     base_bot_url: String,
@@ -36,7 +39,7 @@ impl Botejao {
     ) -> Botejao {
         return Botejao {
             unicamp_handler: UnicampHandler::new(),
-            usp_handler: UspHandler::new(),
+            usp_handler: ArcUspHandler::new(),
             bot_dispatcher: Dispatcher::new(),
             bot_token,
             base_bot_url: "https://api.telegram.org/bot".to_string(),
@@ -44,8 +47,9 @@ impl Botejao {
     }
 
     pub fn start(mut self) {
-        let bot_url = [self.base_bot_url.as_str(), &self.bot_token.clone()].concat();
-        let thread_bot = Bot::new(bot_url).expect("The bot token appears to be invalid.");
+        self.usp_handler.start_updating();
+
+
 
         self.bot_dispatcher
             .add_command_handler("unicamp", self.unicamp_handler, false);
