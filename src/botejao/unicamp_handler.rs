@@ -26,12 +26,12 @@ impl UnicampHandler {
     }
 
     pub fn send_unicamp_menu(&self, bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for unicamps menu! {:?}", update);
+        info!("Got request for UNICAMPs menu from user: {}", &update.message.as_ref().unwrap().from.as_ref().unwrap().username.as_ref().unwrap());
         info!("Replying to it");
         let menu = self.get_unicamp_menu().unwrap();
         let response = UnicampHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());
         match response {
-            Ok(response) => info!("Successfully sent \n{:?}.", response),
+            Ok(response) => info!("Successfully sent UNICAMPs menu."),
             Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e),
         }
     }

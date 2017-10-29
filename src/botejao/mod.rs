@@ -47,14 +47,23 @@ impl Botejao {
     }
 
     pub fn start(mut self) {
+
         self.usp_handler.start_updating();
 
+
+        let arc_usp_handler = self.usp_handler.actual_arc_usp.clone();
 
 
         self.bot_dispatcher
             .add_command_handler("unicamp", self.unicamp_handler, false);
         self.bot_dispatcher
-            .add_command_handler("usp_central", self.usp_handler, false);
+            .add_command_handler("usp_central", arc_usp_handler.arc_usp_central_replier.clone(), false);
+        self.bot_dispatcher
+            .add_command_handler("usp_fisica", arc_usp_handler.arc_usp_fisica_replier.clone(), false);
+        self.bot_dispatcher
+            .add_command_handler("usp_prefeitura", arc_usp_handler.arc_usp_prefeitura_replier.clone(), false);
+        self.bot_dispatcher
+            .add_command_handler("usp_quimica", arc_usp_handler.arc_usp_quimica_replier.clone(), false);
         self.bot_dispatcher
             .add_command_handler("help", Botejao::send_help, false);
         self.bot_dispatcher
@@ -71,13 +80,14 @@ impl Botejao {
     }
 
     fn send_help(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for help! {:?}", update);
+
+        info!("Got request for help from user: {}", &update.message.as_ref().unwrap().from.as_ref().unwrap().username.as_ref().unwrap());
         info!("Replying to it");
         let help_msg =
             "Esse bot retorna o menu de restaurantes universitarios. Use o comando /unicamp@BotejaoBot ou /usp_central@BotejaoBot para testa-lo.";
         let response = bot.reply_to_message(&update, help_msg);
         match response {
-            Ok(response) => info!("Successfully sent \n{:?}.", response),
+            Ok(_) => info!("Successfully sent the help message."),
             Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", help_msg, e),
         }
     }
