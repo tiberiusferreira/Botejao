@@ -27,7 +27,6 @@ pub struct Botejao {
     usp_handler: ArcUspHandler,
     bot_dispatcher: Dispatcher,
     bot_token: String,
-    base_bot_url: String,
 }
 
 
@@ -42,7 +41,6 @@ impl Botejao {
             usp_handler: ArcUspHandler::new(),
             bot_dispatcher: Dispatcher::new(),
             bot_token,
-            base_bot_url: "https://api.telegram.org/bot".to_string(),
         };
     }
 
