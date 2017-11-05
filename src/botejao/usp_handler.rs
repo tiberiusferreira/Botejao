@@ -58,7 +58,15 @@ impl Command for ArcUspReplier {
 
 impl UspReplier {
     pub fn post_to_usp(&self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
-        info!("Got request for USPs menu from user: {}", &update.message.as_ref().unwrap().from.as_ref().unwrap().username.as_ref().unwrap());
+        info!("Got request for USPs menu");
+        let username = update.message.as_ref()
+            .and_then(|msg| msg.from.as_ref())
+            .and_then(|from| from.username.as_ref());
+
+        match username {
+            Some(username) => info!("Got message from user: {}", username),
+            None => error!("The following update did not contain an username: {:?}", update)
+        }
         info!("Sending cached response");
         let cached_response = &self.cached_response_struct.read().unwrap().cached_response;
         let response = UspHandler::reply_to_message_as_markdown(&bot, &update, cached_response.as_str());
@@ -131,11 +139,15 @@ impl UspHandler {
     }
 
     pub fn update_cached_response(&self){
-
+        info!("Checking if Firefox is UP");
         loop {
-            let output = String::from_utf8(std::process::Command::new("pidof")
+            let output = String::from_utf8
+                (std::process::Command::new("pidof")
                 .arg("firefox")
-                .output().unwrap().stdout).unwrap();
+                .output()
+                .unwrap()
+                .stdout)
+                .unwrap();
             if !output.is_empty() {
                 std::process::Command::new("kill")
                     .arg(&output.trim())
@@ -148,9 +160,14 @@ impl UspHandler {
         }
 
         info!("Opening session!");
-        let sess = self.geckodriver.session().unwrap();
+        let sess = match self.geckodriver.session() {
+            Ok(sess) => sess,
+            Err(err) => {
+                error!("Could not open DriverSession, got error {}", err);
+                return;
+            },
+        };
         info!("Going to sites!");
-
         let websites = vec![
             self.arc_usp_central_replier.arc_usp_replier.as_ref(),
             self.arc_usp_prefeitura_replier.arc_usp_replier.as_ref(),
@@ -160,7 +177,14 @@ impl UspHandler {
         for arc_usp_replier in websites.iter() {
             let mut menu = String::new();
             info!("Going to site {}!", arc_usp_replier.menu_website);
-            sess.go(arc_usp_replier.menu_website.as_str()).unwrap();
+            match sess.go(arc_usp_replier.menu_website.as_str()){
+                Ok(_) => (),
+                Err(err) => {
+                    error!("Could not go to site {}, got error {}",arc_usp_replier.menu_website, err);
+                    return;
+                }
+
+            }
             info!("Got site response, checking if he is already loaded!");
             for i in 0..30 {
                 if UspHandler::site_loaded(&sess) {

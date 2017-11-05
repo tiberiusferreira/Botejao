@@ -12,5 +12,5 @@ RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.15.0/geckod
     && /bin/bash -c "source ~/.profile && cargo build -vv"
 
 
-CMD /bin/bash -c "export PATH=$PATH:$(pwd) && source ~/.profile && xvfb-run cargo run -vv"
+CMD /bin/bash -c "export PATH=$PATH:$(pwd) && source ~/.profile && xvfb-run env RUST_BACKTRACE=1 cargo run -vv"
 

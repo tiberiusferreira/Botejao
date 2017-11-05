@@ -26,7 +26,15 @@ impl UnicampHandler {
     }
 
     pub fn send_unicamp_menu(&self, bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for UNICAMPs menu from user: {}", &update.message.as_ref().unwrap().from.as_ref().unwrap().username.as_ref().unwrap());
+        info!("Got request for UNICAMPs menu!");
+        let username = update.message.as_ref()
+            .and_then(|msg| msg.from.as_ref())
+            .and_then(|from| from.username.as_ref());
+
+        match username {
+            Some(username) => info!("Got message from user: {}", username),
+            None => error!("The following update did not contain an username: {:?}", update)
+        }
         info!("Replying to it");
         let menu = self.get_unicamp_menu().unwrap();
         let response = UnicampHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());

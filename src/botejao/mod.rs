@@ -12,16 +12,9 @@ extern crate webdriver_client;
 mod unicamp_handler;
 mod usp_handler;
 use unicamp_handler::UnicampHandler;
-use encoding::{Encoding};
-use std::io::{Write};
-use std::path::{PathBuf};
-use teleborg::{Bot, Dispatcher, ParseMode, Updater};
+use teleborg::{Bot, Dispatcher, Updater};
 use teleborg::objects::Update;
-use scraper::{Selector};
 use usp_handler::ArcUspHandler;
-use std::thread;
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
 pub struct Botejao {
     unicamp_handler: UnicampHandler,
     usp_handler: ArcUspHandler,
@@ -78,8 +71,15 @@ impl Botejao {
     }
 
     fn send_help(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
+        info!("Got request for help!");
+        let username = update.message.as_ref()
+            .and_then(|msg| msg.from.as_ref())
+            .and_then(|from| from.username.as_ref());
 
-        info!("Got request for help from user: {}", &update.message.as_ref().unwrap().from.as_ref().unwrap().username.as_ref().unwrap());
+        match username {
+            Some(username) => info!("Got message from user: {}", username),
+            None => error!("The following update did not contain an username: {:?}", update)
+        }
         info!("Replying to it");
         let help_msg =
             "Esse bot retorna o menu de restaurantes universitarios. Use o comando /unicamp@BotejaoBot ou /usp_central@BotejaoBot para testa-lo.";
