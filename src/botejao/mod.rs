@@ -63,8 +63,8 @@ impl Botejao {
             .add_command_handler("start", Botejao::send_help, false);
         Updater::start(
             Some(self.bot_token.clone()),
-            None,
-            None,
+            Option::Some(2),
+            Option::Some(30),
             None,
             self.bot_dispatcher,
         );

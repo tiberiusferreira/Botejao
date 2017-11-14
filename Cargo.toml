@@ -23,5 +23,10 @@ futures = "*"
 time = "*"
 encoding = "*"
 reqwest = "*"
-teleborg = "0.1.32"
+[dependencies.teleborg]
+git = "https://github.com/tiberiusferreira/teleborg.git"
+branch = "fix_getting_updates"
+
+#teleborg = "0.1.32"
+#teleborg = { path = "../teleborg" }
 
