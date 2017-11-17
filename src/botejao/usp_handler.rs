@@ -186,7 +186,7 @@ impl UspHandler {
 
             }
             info!("Got site response, checking if he is already loaded!");
-            for i in 0..30 {
+            for i in 0..5 {
                 if UspHandler::site_loaded(&sess) {
                     info!("Parsing site!");
                     menu = UspHandler::get_todays_menu_formated(time::now().tm_wday, &sess);
@@ -196,9 +196,9 @@ impl UspHandler {
                     }
                 } else {
                     info!("Was NOT loaded.");
-                    info!("Sleeping for 500 ms for the {} time!", i);
-                    let quarter_sec = Duration::from_secs(1);
-                    std::thread::sleep(quarter_sec);
+                    info!("Sleeping for 2 s for the {} time!", i);
+                    let two_sec = Duration::from_secs(2);
+                    std::thread::sleep(two_sec);
                 }
             }
             if menu.is_empty() {
@@ -215,12 +215,32 @@ impl UspHandler {
         }
     }
 
+
     fn site_loaded(session: &DriverSession) -> bool{
-        return !session.find_element("#almocoSegunda", LocationStrategy::Css)
-            .unwrap()
-            .text()
-            .unwrap().is_empty();
+        let selectors = vec!["#diaSegunda", "#almocoSegunda", "#jantarSegunda",
+                            "#diaTerca", "#almocoTerca", "#jantarTerca",
+                            "#diaQuarta", "#almocoQuarta", "#jantarQuarta",
+                            "#diaQuinta", "#almocoQuinta", "#jantarQuinta",
+                            "#diaSexta", "#almocoSexta", "#jantarSexta"
+        ];
+        for selector in selectors.iter(){
+            let has_element = session.find_element(selector, LocationStrategy::Css)
+                .and_then(|page_element| page_element.text());
+            match has_element {
+                Ok(text) => {
+                    if text.is_empty() {
+                        return false;
+                    }
+                }
+                Err(_) => {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
+
+
     pub fn get_todays_menu_formated(day_since_sunday: i32, session: &DriverSession) -> String{
         match  day_since_sunday {
             1 => format!("*{}*:\n\n*Almoço:*\n{}\n\n*Jantar:*\n{}" ,

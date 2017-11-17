@@ -2,7 +2,7 @@ FROM arm32v7/debian:stretch
 
 WORKDIR /botejao
 
-RUN apt update && apt upgrade -y && apt install -y \
+RUN apt update && apt dist-upgrade -y && apt install -y \
     build-essential \
     pkg-config \
     openssl \

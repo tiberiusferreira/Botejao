@@ -26,9 +26,7 @@ pub struct Botejao {
 
 
 impl Botejao {
-    pub fn new(
-        bot_token: String,
-    ) -> Botejao {
+    pub fn new(bot_token: String) -> Botejao {
         return Botejao {
             unicamp_handler: UnicampHandler::new(),
             usp_handler: ArcUspHandler::new(),
@@ -64,7 +62,7 @@ impl Botejao {
         Updater::start(
             Some(self.bot_token.clone()),
             Option::Some(2),
-            Option::Some(30),
+            Option::Some(10*60),
             None,
             self.bot_dispatcher,
         );
