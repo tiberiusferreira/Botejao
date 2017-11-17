@@ -8,7 +8,7 @@ use std::env;
 
 
 fn main() {
-    Logger::with_str("debug")
+    Logger::with_str("info")
 //        .log_to_file()
 //        .directory("log_files")
         .format(opt_format)
