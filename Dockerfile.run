@@ -8,7 +8,7 @@ RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.15.0/geckod
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && git init . \
     && git remote add -t \* -f origin https://github.com/tiberiusferreira/botejao.git \
-    && git checkout alpha \
+    && git checkout master \
     && /bin/bash -c "source ~/.profile && cargo build -vv"
 
 
