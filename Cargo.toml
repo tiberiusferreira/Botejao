@@ -26,6 +26,8 @@ reqwest = "*"
 [dependencies.teleborg]
 git = "https://github.com/tiberiusferreira/teleborg.git"
 branch = "fix_getting_updates"
+#path = "../teleborg"
+
 
 #teleborg = "0.1.32"
 #teleborg = { path = "../teleborg" }
