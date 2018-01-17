@@ -9,8 +9,8 @@ use std::env;
 
 fn main() {
     Logger::with_str("info")
-//        .log_to_file()
-//        .directory("log_files")
+        .log_to_file()
+        .directory("log_files")
         .format(opt_format)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
