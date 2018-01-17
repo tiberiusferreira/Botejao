@@ -17,7 +17,7 @@ use teleborg::objects::Update;
 use usp_handler::ArcUspHandler;
 pub struct Botejao {
     unicamp_handler: UnicampHandler,
-    usp_handler: ArcUspHandler,
+//    usp_handler: ArcUspHandler,
     telegram_api: Bot,
 }
 
@@ -28,7 +28,7 @@ impl Botejao {
     pub fn new(bot_token: String) -> Botejao {
         return Botejao {
             unicamp_handler: UnicampHandler::new(),
-            usp_handler: ArcUspHandler::new(),
+//            usp_handler: ArcUspHandler::new(),
             telegram_api: Bot::new(bot_token).unwrap(),
         };
     }
