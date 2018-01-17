@@ -8,18 +8,17 @@ extern crate scraper;
 extern crate teleborg;
 extern crate time;
 extern crate webdriver_client;
-
+use teleborg::*;
 mod unicamp_handler;
 mod usp_handler;
 use unicamp_handler::UnicampHandler;
-use teleborg::{Bot, Dispatcher, Updater};
+use teleborg::{Bot};
 use teleborg::objects::Update;
 use usp_handler::ArcUspHandler;
 pub struct Botejao {
     unicamp_handler: UnicampHandler,
     usp_handler: ArcUspHandler,
-    bot_dispatcher: Dispatcher,
-    bot_token: String,
+    telegram_api: Bot,
 }
 
 
@@ -30,62 +29,70 @@ impl Botejao {
         return Botejao {
             unicamp_handler: UnicampHandler::new(),
             usp_handler: ArcUspHandler::new(),
-            bot_dispatcher: Dispatcher::new(),
-            bot_token,
+            telegram_api: Bot::new(bot_token).unwrap(),
         };
     }
 
+    fn get_updates_list(&self) -> Vec<Update>{
+        let updates_channel = self.telegram_api.get_updates_channel();
+        loop {
+            let possible_updates_list = updates_channel.recv();
+            match possible_updates_list {
+                Ok(update_list) => return update_list,
+                Err(e) => {
+                    error!("Error while getting updates list from Teleborg: {}", e);
+                }
+            };
+        }
+    }
+
+    fn get_response_for_update(&self, update: &Update) -> Option<String> {
+        let update_msg_text = match update.message.as_ref().and_then(|msg| msg.text.as_ref()) {
+            Some(text) => text,
+            None => {
+                error!("Update with no message text!");
+                return None;
+            }
+        };
+        match update_msg_text.as_str() {
+            "/unicamp" | "/unicamp@BotejaoBot" => {
+//                return Some(self.unicamp_handler.get_fresh_unicamp_menu().unwrap())
+                return Some(self.unicamp_handler.get_unicamp_menu());
+            },
+            _ => {
+                return Some("O Bot está sob reformas, somente /unicamp@BotejaoBot disponível no momento.".to_string());
+            }
+        }
+    }
+
+    fn handle_update(&self, update: &Update){
+        let message = match update.message.as_ref() {
+            Some(msg) => msg,
+            None => {
+                error!("Update with no message : {:?}", update);
+                return;
+            }
+        };
+
+        if let Some(response) = self.get_response_for_update(update){
+            let outgoing_message = OutgoingMessage::new(message.chat.id,&response);
+            self.telegram_api.send_msg(outgoing_message);
+        }
+    }
+
     pub fn start(mut self) {
+//        self.usp_handler.start_updating();
 
-        self.usp_handler.start_updating();
+        self.telegram_api.start_getting_updates();
 
-
-        let arc_usp_handler = self.usp_handler.actual_arc_usp.clone();
-
-
-        self.bot_dispatcher
-            .add_command_handler("unicamp", self.unicamp_handler, false);
-        self.bot_dispatcher
-            .add_command_handler("usp_central", arc_usp_handler.arc_usp_central_replier.clone(), false);
-        self.bot_dispatcher
-            .add_command_handler("usp_fisica", arc_usp_handler.arc_usp_fisica_replier.clone(), false);
-        self.bot_dispatcher
-            .add_command_handler("usp_prefeitura", arc_usp_handler.arc_usp_prefeitura_replier.clone(), false);
-        self.bot_dispatcher
-            .add_command_handler("usp_quimica", arc_usp_handler.arc_usp_quimica_replier.clone(), false);
-        self.bot_dispatcher
-            .add_command_handler("help", Botejao::send_help, false);
-        self.bot_dispatcher
-            .add_command_handler("ajuda", Botejao::send_help, false);
-        self.bot_dispatcher
-            .add_command_handler("start", Botejao::send_help, false);
-        Updater::start(
-            Some(self.bot_token.clone()),
-            Option::Some(5),
-            Option::Some(40),
-            None,
-            self.bot_dispatcher,
-        );
-    }
-
-    fn send_help(bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for help!");
-        let username = update.message.as_ref()
-            .and_then(|msg| msg.from.as_ref())
-            .and_then(|from| from.username.as_ref());
-
-        match username {
-            Some(username) => info!("Got message from user: {}", username),
-            None => error!("The following update did not contain an username: {:?}", update)
-        }
-        info!("Replying to it");
-        let help_msg =
-            "Esse bot retorna o menu de restaurantes universitarios. Use o comando /unicamp@BotejaoBot ou /usp_central@BotejaoBot para testa-lo.";
-        let response = bot.reply_to_message(&update, help_msg);
-        match response {
-            Ok(_) => info!("Successfully sent the help message."),
-            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", help_msg, e),
+        loop {
+            let updates = self.get_updates_list();
+            for update in updates {
+                self.handle_update(&update);
+            }
         }
     }
+
+
 
 }

@@ -1,5 +1,5 @@
 use webdriver_client::firefox::GeckoDriver;
-use teleborg::{Bot, Command, ParseMode, Updater};
+use teleborg::{Bot, ParseMode};
 use teleborg::objects::{Update, Message};
 use teleborg::error::Error;
 use scraper::{Selector};
@@ -50,11 +50,11 @@ pub struct ArcUspHandler {
     pub actual_arc_usp: Arc<UspHandler>,
 }
 
-impl Command for ArcUspReplier {
-    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
-        self.arc_usp_replier.post_to_usp(bot, update, args);
-    }
-}
+//impl Command for ArcUspReplier {
+//    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+//        self.arc_usp_replier.post_to_usp(bot, update, args);
+//    }
+//}
 
 impl UspReplier {
     pub fn post_to_usp(&self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
@@ -69,11 +69,11 @@ impl UspReplier {
         }
         info!("Sending cached response");
         let cached_response = &self.cached_response_struct.read().unwrap().cached_response;
-        let response = UspHandler::reply_to_message_as_markdown(&bot, &update, cached_response.as_str());
-        match response {
-            Ok(_) => info!("Successfully sent USPs menu."),
-            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", cached_response, e),
-        }
+//        let response = UspHandler::reply_to_message_as_markdown(&bot, &update, cached_response.as_str());
+//        match response {
+//            Ok(_) => info!("Successfully sent USPs menu."),
+//            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", cached_response, e),
+//        }
     }
 }
 
@@ -139,25 +139,25 @@ impl UspHandler {
     }
 
     pub fn update_cached_response(&self){
-        info!("Checking if Firefox is UP");
-        loop {
-            let output = String::from_utf8
-                (std::process::Command::new("pidof")
-                .arg("firefox")
-                .output()
-                .unwrap()
-                .stdout)
-                .unwrap();
-            if !output.is_empty() {
-                std::process::Command::new("kill")
-                    .arg(&output.trim())
-                    .spawn().expect("Could not kill");
-                error!("Killed firefox with PID {} !", output);
-            } else {
-                info!("Did not need to kill firefox!");
-                break;
-            }
-        }
+//        info!("Checking if Firefox is UP");
+//        loop {
+//            let output = String::from_utf8
+//                (std::process::Command::new("pidof")
+//                .arg("firefox")
+//                .output()
+//                .unwrap()
+//                .stdout)
+//                .unwrap();
+//            if !output.is_empty() {
+//                std::process::Command::new("kill")
+//                    .arg(&output.trim())
+//                    .spawn().expect("Could not kill");
+//                error!("Killed firefox with PID {} !", output);
+//            } else {
+//                info!("Did not need to kill firefox!");
+//                break;
+//            }
+//        }
 
         info!("Opening session!");
         let sess = match self.geckodriver.session() {
@@ -270,22 +270,22 @@ impl UspHandler {
         }
     }
 
-    fn reply_to_message_as_markdown(
-        bot: &Bot,
-        update: &Update,
-        text: &str,
-    ) -> Result<Message, Error> {
-        let message = update.clone().message.unwrap();
-        let message_id = message.message_id;
-        let chat_id = message.chat.id;
-        bot.send_message(
-            &chat_id,
-            text,
-            Some(&ParseMode::Markdown),
-            None,
-            None,
-            Some(&message_id),
-            None,
-        )
-    }
+//    fn reply_to_message_as_markdown(
+//        bot: &Bot,
+//        update: &Update,
+//        text: &str,
+//    ) -> Result<Message, Error> {
+//        let message = update.clone().message.unwrap();
+//        let message_id = message.message_id;
+//        let chat_id = message.chat.id;
+//        bot.send_message(
+//            &chat_id,
+//            text,
+//            Some(&ParseMode::Markdown),
+//            None,
+//            None,
+//            Some(&message_id),
+//            None,
+//        )
+//    }
 }

@@ -1,4 +1,4 @@
-use teleborg::{Bot, Command, ParseMode, Updater};
+use teleborg::{Bot, ParseMode};
 use teleborg::objects::{Update, Message};
 use teleborg::error::Error;
 use reqwest;
@@ -6,46 +6,53 @@ use scraper::{Html, Selector};
 use encoding::{DecoderTrap, Encoding};
 use encoding::all::ISO_8859_1;
 use std::io::{Read, Write};
+use std::sync::{Arc, RwLock};
+use std::error;
+use std::thread;
+use std::time::Duration;
+
+const MENU_WEBSITE: &str = "https://www.prefeitura.unicamp.br/apps/site/cardapio.php";
 
 pub struct UnicampHandler {
-    menu_website: String
+    cached_menu: Arc<RwLock<String>>
 }
 
-impl Command for UnicampHandler {
-    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
-        self.send_unicamp_menu(bot, update, args);
-    }
-}
+//impl Command for UnicampHandler {
+//    fn execute(&mut self, bot: &Bot, update: Update, args: Option<Vec<&str>>) {
+//        self.send_unicamp_menu(bot, update, args);
+//    }
+//}
 
 impl UnicampHandler {
 
     pub fn new() -> UnicampHandler {
-        UnicampHandler{
-            menu_website: "https://www.prefeitura.unicamp.br/apps/site/cardapio.php".to_string()
-        }
+
+        let unicamp_handler = UnicampHandler{
+            cached_menu: Arc::new(RwLock::new("Atualizando menu, tente de novo em alguns segundos.".to_string())),
+        };
+        let thread_menu_ref = unicamp_handler.cached_menu.clone();
+        thread::spawn(move ||{
+            loop {
+                let new_menu = match UnicampHandler::get_fresh_unicamp_menu() {
+                    Ok(new_menu) => new_menu,
+                    Err(_) => continue
+                };
+                let mut cached_menu = thread_menu_ref.write().unwrap();
+                *cached_menu = new_menu;
+                thread::sleep(Duration::from_secs(10*60));
+            }
+        });
+        unicamp_handler
+
     }
 
-    pub fn send_unicamp_menu(&self, bot: &Bot, update: Update, _: Option<Vec<&str>>) {
-        info!("Got request for UNICAMPs menu!");
-        let username = update.message.as_ref()
-            .and_then(|msg| msg.from.as_ref())
-            .and_then(|from| from.username.as_ref());
 
-        match username {
-            Some(username) => info!("Got message from user: {}", username),
-            None => error!("The following update did not contain an username: {:?}", update)
-        }
-        info!("Replying to it");
-        let menu = self.get_unicamp_menu().unwrap();
-        let response = UnicampHandler::reply_to_message_as_markdown(&bot, &update, menu.as_str());
-        match response {
-            Ok(response) => info!("Successfully sent UNICAMPs menu."),
-            Err(e) => error!("Failed to send \n{}, got \n{:?} as response.", menu, e),
-        }
+    pub fn get_unicamp_menu(&self) -> String{
+        let menu = self.cached_menu.read().unwrap();
+        menu.clone()
     }
-
-    fn get_unicamp_menu(&self) -> Result<String, ()> {
-        let mut resp = match reqwest::get(self.menu_website.as_str()) {
+    fn get_fresh_unicamp_menu() -> Result<String, ()> {
+        let mut resp = match reqwest::get(MENU_WEBSITE) {
             Ok(response) => response,
             Err(e) => {
                 error!("Could not get site error: {}", e);
@@ -58,99 +65,80 @@ impl UnicampHandler {
         };
     }
 
-    pub fn reply_to_message_as_markdown(
-        bot: &Bot,
-        update: &Update,
-        text: &str,
-    ) -> Result<Message, Error> {
-        let message = update.clone().message.unwrap();
-        let message_id = message.message_id;
-        let chat_id = message.chat.id;
-        bot.send_message(
-            &chat_id,
-            text,
-            Some(&ParseMode::Markdown),
-            None,
-            None,
-            Some(&message_id),
-            None,
-        )
-    }
-
     fn remove_spaces_and_tabs(input: String) -> String {
         let mut input = input.replace("\n", "").replace("\t", "");
         input.push('\n');
         return input;
     }
 
-    fn apply_selectors(selector: &Selector, fragment: &Html) -> String {
-        fragment
+    fn apply_selectors(selector: &Selector, fragment: &Html) -> Result<String, ()> {
+        let next = match fragment
             .select(&selector)
-            .next()
-            .unwrap()
-            .text()
-            .collect::<String>()
+            .next(){
+            Some(next) => next,
+            None => return Err(())
+        };
+        let result = next.text().collect::<String>();
+        Ok(result)
     }
 
 
 
-    fn filter_unicamp_response(
-        resp: &mut reqwest::Response
-    ) -> Result<String, String> {
+    fn filter_unicamp_response(resp: &mut reqwest::Response) -> Result<String, ()> {
         let mut body = Vec::new();
         let body_str;
 
 
 
-        match resp.read_to_end(&mut body) {
-            Ok(_) => {
-                body_str = ISO_8859_1.decode(&*body, DecoderTrap::Strict).unwrap();
-            }
-            Err(e) => {
-                return Err(format!("Error reading site response {}", e));
-            }
+        match resp.read_to_end(&mut body){
+            Ok(_) => {},
+            Err(e) => return Err(()),
         }
+        body_str = match ISO_8859_1.decode(&*body, DecoderTrap::Strict){
+            Ok(res) => {res},
+            Err(e) => return Err(()),
+        };
         let fragment = Html::parse_fragment(&body_str);
 
         let day_selector = Selector::parse(
             "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > p",
-        ).unwrap();
+        )?;
 
         let selector_breakfast = Selector::parse(
             "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(2)",
-        ).unwrap();
+        )?;
 
 
         let mut lunch_selectors = Vec::new();
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(1) > td",
-            ).unwrap(),
+            )?,
         );
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(2) > td",
-            ).unwrap(),
+            )?,
         );
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(3) > td",
-            ).unwrap(),
+            )?,
         );
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td",
-            ).unwrap(),
+            )?,
         );
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(5) > td",
-            ).unwrap(),
+            )?,
         );
         lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(1) > table > tbody > tr:nth-child(6) > td",
-            ).unwrap(),
+            )?,
         );
 
         let mut veg_lunch_selectors = Vec::new();
@@ -158,27 +146,27 @@ impl UnicampHandler {
         veg_lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(1) > td",
-            ).unwrap(),
+            )?,
         );
         veg_lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(2) > td",
-            ).unwrap(),
+            )?,
         );
         veg_lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(4) > td",
-            ).unwrap(),
+            )?,
         );
         veg_lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(5) > td",
-            ).unwrap(),
+            )?,
         );
         veg_lunch_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(2) > table > tbody > tr:nth-child(6) > td",
-            ).unwrap(),
+            )?,
         );
 
         let mut dinner_selectors = Vec::new();
@@ -186,68 +174,68 @@ impl UnicampHandler {
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(1) > td",
-            ).unwrap(),
+            )?,
         );
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(2) > td",
-            ).unwrap(),
+            )?,
         );
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(3) > td",
-            ).unwrap(),
+            )?,
         );
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(4) > td",
-            ).unwrap(),
+            )?,
         );
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(5) > td",
-            ).unwrap(),
+            )?,
         );
         dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(3) > table > tbody > tr:nth-child(6) > td",
-            ).unwrap(),
+            )?,
         );
 
         let mut veg_dinner_selectors = Vec::new();
         veg_dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(1) > td",
-            ).unwrap(),
+            )?,
         );
         veg_dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(2) > td",
-            ).unwrap(),
+            )?,
         );
         veg_dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(4) > td",
-            ).unwrap(),
+            )?,
         );
         veg_dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(5) > td",
-            ).unwrap(),
+            )?,
         );
         veg_dinner_selectors.push(
             Selector::parse(
                 "#sistema_cardapio > table > tbody > tr:nth-child(1) > td:nth-child(1) > table > tbody > tr:nth-child(4) > td:nth-child(4) > table > tbody > tr:nth-child(6) > td",
-            ).unwrap(),
+            )?,
         );
 
         let mut cafe_da_manha = String::from("*Café da Manha:* \n");
 
-        let extracted_break_fast = UnicampHandler::apply_selectors(&selector_breakfast, &fragment);
+        let extracted_break_fast = UnicampHandler::apply_selectors(&selector_breakfast, &fragment)?;
 
         cafe_da_manha.push_str(UnicampHandler::remove_spaces_and_tabs(extracted_break_fast).as_str());
 
-        let extracted_day = UnicampHandler::apply_selectors(&day_selector, &fragment);
+        let extracted_day = UnicampHandler::apply_selectors(&day_selector, &fragment)?;
 
         let day = format!("*{}*", UnicampHandler::remove_spaces_and_tabs(extracted_day));
 
@@ -256,7 +244,7 @@ impl UnicampHandler {
 
         for selector in &lunch_selectors {
             lunch.push_str(
-                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment))
+                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment)?)
                     .as_str(),
             );
         }
@@ -265,7 +253,7 @@ impl UnicampHandler {
 
         for selector in &veg_lunch_selectors {
             lunch_veg.push_str(
-                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment))
+                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment)?)
                     .as_str(),
             );
         }
@@ -273,7 +261,7 @@ impl UnicampHandler {
 
         for selector in &dinner_selectors {
             dinner.push_str(
-                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment))
+                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment)?)
                     .as_str(),
             );
         }
@@ -282,7 +270,7 @@ impl UnicampHandler {
 
         for selector in &veg_dinner_selectors {
             dinner_veg.push_str(
-                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment))
+                UnicampHandler::remove_spaces_and_tabs(UnicampHandler::apply_selectors(selector, &fragment)?)
                     .as_str(),
             );
         }
