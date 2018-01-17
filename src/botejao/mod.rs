@@ -77,6 +77,8 @@ impl Botejao {
         if let Some(response) = self.get_response_for_update(update){
             let outgoing_message = OutgoingMessage::new(message.chat.id,&response);
             self.telegram_api.send_msg(outgoing_message);
+        }else{
+            info!("Had no response to send!");
         }
     }
 

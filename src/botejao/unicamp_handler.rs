@@ -37,8 +37,10 @@ impl UnicampHandler {
                     Ok(new_menu) => new_menu,
                     Err(_) => continue
                 };
-                let mut cached_menu = thread_menu_ref.write().unwrap();
-                *cached_menu = new_menu;
+                {
+                    let mut cached_menu = thread_menu_ref.write().unwrap();
+                    *cached_menu = new_menu;
+                }
                 thread::sleep(Duration::from_secs(10*60));
             }
         });
