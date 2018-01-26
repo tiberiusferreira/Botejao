@@ -1,13 +1,9 @@
-use teleborg::{Bot, ParseMode};
-use teleborg::objects::{Update, Message};
-use teleborg::error::Error;
 use reqwest;
 use scraper::{Html, Selector};
 use encoding::{DecoderTrap, Encoding};
 use encoding::all::ISO_8859_1;
-use std::io::{Read, Write};
+use std::io::{Read};
 use std::sync::{Arc, RwLock};
-use std::error;
 use std::thread;
 use std::time::Duration;
 
@@ -41,7 +37,7 @@ impl UnicampHandler {
                     let mut cached_menu = thread_menu_ref.write().unwrap();
                     *cached_menu = new_menu;
                 }
-                thread::sleep(Duration::from_secs(10*60));
+                thread::sleep(Duration::from_secs(40*60));
             }
         });
         unicamp_handler
@@ -94,11 +90,11 @@ impl UnicampHandler {
 
         match resp.read_to_end(&mut body){
             Ok(_) => {},
-            Err(e) => return Err(()),
+            Err(_) => return Err(()),
         }
         body_str = match ISO_8859_1.decode(&*body, DecoderTrap::Strict){
             Ok(res) => {res},
-            Err(e) => return Err(()),
+            Err(_) => return Err(()),
         };
         let fragment = Html::parse_fragment(&body_str);
 

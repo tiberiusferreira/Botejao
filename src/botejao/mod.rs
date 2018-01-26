@@ -10,11 +10,11 @@ extern crate time;
 extern crate webdriver_client;
 use teleborg::*;
 mod unicamp_handler;
-mod usp_handler;
+//mod usp_handler;
 use unicamp_handler::UnicampHandler;
 use teleborg::{Bot};
 use teleborg::objects::Update;
-use usp_handler::ArcUspHandler;
+//use usp_handler::ArcUspHandler;
 pub struct Botejao {
     unicamp_handler: UnicampHandler,
 //    usp_handler: ArcUspHandler,
