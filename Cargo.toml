@@ -15,13 +15,16 @@ path = "src/botejao/mod.rs"
 
 [dependencies]
 webdriver_client = "0.1.0"
+difference = "*"
 scraper = "*"
 error-chain = "*"
 flexi_logger = "*"
 log = "*"
-futures = "*"
 time = "*"
+failure = "*"
+failure_derive = "*"
 encoding = "*"
+chrono = "*"
 reqwest = "*"
 [dependencies.teleborg]
 git = "https://github.com/tiberiusferreira/teleborg.git"
