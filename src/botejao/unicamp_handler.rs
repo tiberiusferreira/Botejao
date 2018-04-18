@@ -361,7 +361,7 @@ impl UnicampHandler {
                     Self::erase_and_create_new_day_file(dt.num_days_from_ce());
                 }
 
-                thread::sleep(Duration::from_secs(10*60));
+                thread::sleep(Duration::from_secs(60*60));
             }
         });
         unicamp_handler
