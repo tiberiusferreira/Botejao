@@ -2,33 +2,31 @@
 name = "Botejao"
 version = "0.1.0"
 authors = ["Tiberio D A R Ferreira <tiberiusferreira@gmail.com>"]
+edition = "2018"
+
 [[bin]]
 name = "botejao"
-path = "src/bin.rs"
-
+path = "src/main.rs"
 
 [lib]
-name = "botejao"
-path = "src/botejao/mod.rs"
+name = "unicamp_menu"
+path = "src/lib.rs"
+
 
 
 
 [dependencies]
-webdriver_client = "0.1.0"
-difference = "*"
-scraper = "*"
-error-chain = "*"
-flexi_logger = "*"
-log = "*"
-time = "*"
-failure = "*"
-failure_derive = "*"
-encoding = "*"
-chrono = "*"
-reqwest = "*"
-[dependencies.teleborg]
-git = "https://github.com/tiberiusferreira/teleborg.git"
-branch = "fix_getting_updates"
+teloxide = "0.2.0"
+tokio = "0.2.13"
+log = "0.4.8"
+flexi_logger = "0.15.1"
+futures = "0.3.4"
+surf = "2.0.0-alpha.0"
+encoding = "0.2.33"
+reqwest = "0.10.4"
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4"
+thiserror = "1.0"
 #path = "../teleborg"
 
 
