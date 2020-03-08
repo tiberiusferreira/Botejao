@@ -27,7 +27,7 @@ async fn run() {
             },
             Err(err) => {
                 log::info!("Error initializing: {}.\n Trying again in {}s", err, time_between_updates);
-                async_std::task::sleep(Duration::from_secs(60)).await;
+                async_std::task::sleep(Duration::from_secs(time_between_updates)).await;
             },
         }
     }
