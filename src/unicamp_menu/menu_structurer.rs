@@ -2,6 +2,89 @@ use crate::unicamp_menu::structs::{StructuredWeekMenus, WeekMenu, Cardapio, Meal
 use crate::unicamp_menu::BotejaoError;
 use chrono::{NaiveDate};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_menu_ordering() {
+        let cardapio0 = Cardapio{
+            data: "2020-03-09".to_string(),
+            tipo: "Almoço".to_string(),
+            acompanhamento: "".to_string(),
+            prato_principal: "".to_string(),
+            guarnicao: "".to_string(),
+            pts: "".to_string(),
+            salada: "".to_string(),
+            sobremesa: "".to_string(),
+            suco: "".to_string(),
+            obs: "".to_string()
+        };
+        let cardapio1 = Cardapio{
+            data: "2020-03-10".to_string(),
+            tipo: "Jantar".to_string(),
+            acompanhamento: "".to_string(),
+            prato_principal: "".to_string(),
+            guarnicao: "".to_string(),
+            pts: "".to_string(),
+            salada: "".to_string(),
+            sobremesa: "".to_string(),
+            suco: "".to_string(),
+            obs: "".to_string()
+        };
+        let cardapio2 = Cardapio{
+            data: "2020-03-11".to_string(),
+            tipo: "Jantar".to_string(),
+            acompanhamento: "".to_string(),
+            prato_principal: "".to_string(),
+            guarnicao: "".to_string(),
+            pts: "".to_string(),
+            salada: "".to_string(),
+            sobremesa: "".to_string(),
+            suco: "".to_string(),
+            obs: "".to_string()
+        };
+        let week_menu_ordered = WeekMenu{
+            menus: vec![cardapio0.clone(), cardapio1.clone(), cardapio2.clone()]
+        };
+        let week_menu_unordered = WeekMenu{
+            menus: vec![cardapio0.clone(), cardapio1.clone(), cardapio2.clone()]
+        };
+        let structured_ord = StructuredWeekMenus::from_week_menu(week_menu_ordered).unwrap();
+        let structured_unord = StructuredWeekMenus::from_week_menu(week_menu_unordered).unwrap();
+        assert_eq!(structured_ord.next_menus, structured_unord.next_menus);
+        assert!(structured_ord.next_menus[0].day < structured_ord.next_menus[1].day);
+        assert!(structured_ord.next_menus[1].day < structured_ord.next_menus[2].day);
+    }
+
+    #[test]
+    fn test_can_translate_menu_to_struct(){
+        let cardapio0 = Cardapio{
+            data: "2020-03-09".to_string(),
+            tipo: "Almoço".to_string(),
+            acompanhamento: "Acomp".to_string(),
+            prato_principal: "Prato".to_string(),
+            guarnicao: "Guarn".to_string(),
+            pts: "Pts".to_string(),
+            salada: "Salad".to_string(),
+            sobremesa: "Sobrem".to_string(),
+            suco: "Suc".to_string(),
+            obs: "Some".to_string()
+        };
+        let week_menu = WeekMenu{
+            menus: vec![cardapio0.clone()]
+        };
+        let structured_week_menu = StructuredWeekMenus::from_week_menu(week_menu).unwrap();
+        assert_eq!(structured_week_menu.next_menus.len(), 1);
+        let menu = &structured_week_menu.next_menus[0];
+        assert_eq!(menu.lunch, Some(cardapio0));
+        assert_eq!(menu.dinner, None);
+        assert_eq!(menu.veg_lunch, None);
+        assert_eq!(menu.veg_dinner, None);
+    }
+
+}
+
+
 impl StructuredWeekMenus {
     pub fn from_week_menu(week_menu: WeekMenu) -> Result<Self, BotejaoError> {
         let mut structured_day_menus: Vec<StructuredDayMenu> = vec![];
@@ -22,6 +105,7 @@ impl StructuredWeekMenus {
         })
     }
 }
+
 
 
 
