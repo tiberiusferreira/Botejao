@@ -33,7 +33,7 @@ pub struct Cardapio {
     pub obs: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructuredDayMenu {
     pub day: NaiveDate,
     pub lunch: Option<Cardapio>,
@@ -42,6 +42,7 @@ pub struct StructuredDayMenu {
     pub veg_dinner: Option<Cardapio>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum MealKind {
     Lunch,
     Dinner,
@@ -49,7 +50,7 @@ pub enum MealKind {
     VegDinner,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct StructuredWeekMenus {
     /// Should be ordered by earliest to latest day
     pub next_menus: Vec<StructuredDayMenu>,

@@ -53,7 +53,7 @@ impl StructuredDayMenu {
 
     pub fn is_same_day_as(&self, menu: &Cardapio) -> Result<bool, BotejaoError> {
         let other_date = menu_date(menu)?;
-        return Ok(self.day == other_date);
+        Ok(self.day == other_date)
     }
 }
 
