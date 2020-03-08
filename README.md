@@ -13,5 +13,5 @@ A telegram bot which sends UNICAMP's restaurant menu to a Telegram group.
 
 The menu is sent in reverse order as to keep the menu of the current day in the bottom of the chat.
 
-This is a fun project to teach me Rust and get people involved with Telegram. 
+
 

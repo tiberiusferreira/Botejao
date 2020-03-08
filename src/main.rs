@@ -6,6 +6,7 @@ use teloxide::types::{ChatId, ParseMode};
 use teloxide::requests::Request;
 use std::sync::Arc;
 use std::time::Duration;
+use flexi_logger::{colored_opt_format};
 
 
 #[tokio::main]
@@ -14,7 +15,12 @@ async fn main() {
 }
 
 async fn run() {
-    flexi_logger::Logger::with_str("trace").start().unwrap();
+    flexi_logger::Logger::with_str("trace")
+        .format(colored_opt_format)
+        .log_to_file()
+        .directory("./logs")
+        .start().unwrap();
+
     let bot = Bot::from_env();
     let time_between_updates = 60*60;
     let mut old_menu;
