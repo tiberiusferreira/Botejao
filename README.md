@@ -1,9 +1,13 @@
-[![Build Status](https://travis-ci.com/tiberiusferreira/botejao.svg?branch=master)](https://travis-ci.com/tiberiusferreira/botejao)
-[![](https://img.shields.io/badge/telegram%20channel-t.me/botejao_unicamp-blueviolet)](https://t.me/botejao_unicamp)
-
-
 <div align="center">
-  <img src="https://via.placeholder.com/150" width="250"/>
+  <img src="logo.png" width="250"/>
+  <h1>Botejao - Bot for UNICAMP's Bandejão</h1>
+   <a href="https://travis-ci.com/tiberiusferreira/botejao">
+    <img src="https://travis-ci.com/tiberiusferreira/botejao.svg?branch=master">
+   </a>
+   <a href="https://t.me/botejao_unicamp">
+    <img src="https://img.shields.io/badge/telegram%20channel-t.me/botejao_unicamp-blueviolet">
+   </a>
+  
 </div>
 
 # Botejao - Bot for UNICAMP's Bandejão 
